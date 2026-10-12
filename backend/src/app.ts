@@ -2,8 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import path from 'path';
+import errorHandler from './middlewares/error-handler';
 import productsRouter from './routes/products';
 import orderRouter from './routes/order';
+
 
 import { PORT, DB_ADDRESS } from './config';
 
@@ -21,7 +23,7 @@ app.use(cors({
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/product', productsRouter);
 app.use('/order', orderRouter);
-
+app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`App on port ${PORT}`);
 });
