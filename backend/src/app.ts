@@ -1,11 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import { errors as celebrateErrors } from 'celebrate';
 import mongoose from 'mongoose';
 import path from 'path';
+import NotFoundError from './errors/not-found-error';
 import errorHandler from './middlewares/error-handler';
-import productsRouter from './routes/products';
-import orderRouter from './routes/order';
-
+import rootRouter from './routes';
 
 import { PORT, DB_ADDRESS } from './config';
 
@@ -21,8 +21,14 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/product', productsRouter);
-app.use('/order', orderRouter);
+
+app.use('/', rootRouter);
+
+app.use((req, _res, next) => {
+  const error = new NotFoundError(`Маршрут не найден: ${req.originalUrl}`);
+  next(error);
+});
+app.use(celebrateErrors());
 app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`App on port ${PORT}`);

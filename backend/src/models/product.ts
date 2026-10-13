@@ -17,11 +17,11 @@ const imageSchema = new Schema<IImage>(
   {
     fileName: {
       type: String,
-      required: true,
+      required: [true, 'Имя файла изображения обязательно'],
     },
     originalName: {
       type: String,
-      required: true,
+      required: [true, 'Оригинальное имя файла обязательно'],
     },
   },
   { _id: false },
@@ -31,19 +31,20 @@ const productSchema = new Schema<IProduct>(
   {
     title: {
       type: String,
-      minlength: 2,
-      maxlength: 30,
-      required: true,
+      required: [true, 'Поле "title" должно быть заполнено'],
+      minlength: [2, 'Минимальная длина поля "title" - 2 символа'],
+      maxlength: [30, 'Максимальная длина поля "title" - 30 символов'],
       unique: true,
     },
-    image: { type: imageSchema, required: true },
+    image: { type: imageSchema, required: [true, 'Изображение обязательно'] },
     category: {
       type: String,
-      required: true,
+      required: [true, 'Категория обязательна'],
     },
     description: String,
     price: {
       type: Number,
+      min: [0, 'Цена не может быть отрицательной'],
       default: null,
     },
   },

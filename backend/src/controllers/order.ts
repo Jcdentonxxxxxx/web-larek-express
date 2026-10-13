@@ -1,10 +1,11 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
 import { isEmail } from 'validator';
 import { faker } from '@faker-js/faker';
+import BadRequestError from '../errors/bad-request-error';
 import Product from '../models/product';
 
-export default async (req: Request, res: Response) => {
+export default async (req: Request, res: Response, next: NextFunction) => {
   const {
     items, total, payment, email, phone, address,
   } = req.body;
@@ -12,65 +13,68 @@ export default async (req: Request, res: Response) => {
   // проверка payment
   const validPayments = ['card', 'online'];
   if (!payment) {
-    return res.status(400).json({ message: 'Ошибка валидации данных при создании заказа: поле payment обязательно' });
+    return next(new BadRequestError('Ошибка валидации данных при создании заказа: поле payment обязательно'));
   }
   if (!validPayments.includes(payment)) {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: недопустимая платежная система' });
+    return next(new BadRequestError('Ошибка валидации данных при создании заказа: недопустимая платежная система'));
   }
   // проверка email
-  if (!isEmail(email)) {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: некорректный email' });
+  if (!email || !isEmail(email)) {
+    return next(new BadRequestError('Ошибка валидации данных при создании заказа: некорректный email'));
   }
   // проверка phone
   if (typeof phone !== 'string' || phone.trim() === '') {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: некорректный телефон' });
+    return next(new BadRequestError('Ошибка валидации данных при создании заказа: некорректный телефон'));
   }
   // проверка address
   if (typeof address !== 'string' || address.trim() === '') {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: некорректный адрес' });
+    return next(new BadRequestError('Ошибка валидации данных при создании заказа: некорректный адрес'));
   }
   // проверка items
   if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: поле items должно быть непустым массивом' });
+    return next(new BadRequestError('Ошибка валидации данных при создании заказа: поле items должно быть непустым массивом'));
   }
 
   const invalidItem = items.find(
-    (item): item is unknown => typeof item !== 'string' || !Types.ObjectId.isValid(String(item)),
+    (item) => typeof item !== 'string' || !Types.ObjectId.isValid(item),
   );
   if (invalidItem) {
-    return res.status(400).json({
-      message: `Ошибка валидации данных при создании заказа: некорректный ID товара ${invalidItem}`,
-    });
+    return next(new BadRequestError(`Ошибка валидации данных при создании заказа: некорректный ID товара ${invalidItem}`));
   }
 
   const itemIds: Types.ObjectId[] = items.map(
     (item) => new Types.ObjectId(item as string),
   );
-  const products = await Product.find({ _id: { $in: itemIds } });
 
-  if (products.length !== items.length) {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: некоторые товары не найдены' });
-  }
-  const emptyPriceProduct = products.find((product) => product.price === null);
+  try {
+    const products = await Product.find({ _id: { $in: itemIds } });
 
-  if (emptyPriceProduct) {
-    return res.status(400).send({ message: `Ошибка валидации данных при создании заказа: у товара ${emptyPriceProduct.id} отсуствует цена` });
-  }
+    if (products.length !== items.length) {
+      return next(new BadRequestError('Ошибка валидации данных при создании заказа: некоторые товары не найдены'));
+    }
+    const emptyPriceProduct = products.find((product) => product.price === null);
 
-  // проверка total
-  if (typeof total !== 'number' || Number.isNaN(total) || total <= 0) {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: total должно быть положительным числом' });
-  }
-  const calculatedTotal = products.reduce(
-    (acc, p) => acc + (p.price ?? 0),
-    0,
-  );
-  if (calculatedTotal !== total) {
-    return res.status(400).send({ message: 'Ошибка валидации данных при создании заказа: переданная сумма товаров не верна' });
-  }
+    if (emptyPriceProduct) {
+      return next(new BadRequestError(`Ошибка валидации данных при создании заказа: у товара ${emptyPriceProduct.id} отсуствует цена`));
+    }
 
-  return res.status(200).send({
-    id: faker.string.uuid(),
-    total: calculatedTotal,
-  });
+    // проверка total
+    if (typeof total !== 'number' || Number.isNaN(total) || total <= 0) {
+      return next(new BadRequestError('Ошибка валидации данных при создании заказа: total должно быть положительным числом'));
+    }
+    const calculatedTotal = products.reduce(
+      (acc, p) => acc + (p.price ?? 0),
+      0,
+    );
+    if (calculatedTotal !== total) {
+      return next(new BadRequestError('Ошибка валидации данных при создании заказа: переданная сумма товаров не верна'));
+    }
+
+    return res.status(201).send({
+      id: faker.string.uuid(),
+      total: calculatedTotal,
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
