@@ -21,12 +21,18 @@ export default async (req: Request, res: Response, next: NextFunction) => {
   );
 
   try {
-    const products = await Product.find({ _id: { $in: itemIds } });
+    const productsFromDb = await Product.find({ _id: { $in: itemIds } });
 
-    if (products.length !== items.length) {
+    const productsMap = new Map(productsFromDb.map((product) => [product._id.toString(), product]));
+
+    const productsAll = itemIds
+      .map((id) => productsMap.get(id.toString()))
+      .filter((product) => product !== undefined);
+
+    if (productsAll.length !== itemIds.length) {
       return next(new BadRequestError('Ошибка валидации данных при создании заказа: некоторые товары не найдены'));
     }
-    const emptyPriceProduct = products.find((product) => product.price === null);
+    const emptyPriceProduct = productsAll.find((product) => product && product.price === null);
 
     if (emptyPriceProduct) {
       return next(new BadRequestError(`Ошибка валидации данных при создании заказа: у товара ${emptyPriceProduct.id} отсуствует цена`));
@@ -36,8 +42,13 @@ export default async (req: Request, res: Response, next: NextFunction) => {
     if (typeof total !== 'number' || Number.isNaN(total) || total <= 0) {
       return next(new BadRequestError('Ошибка валидации данных при создании заказа: total должно быть положительным числом'));
     }
-    const calculatedTotal = products.reduce(
-      (acc, p) => acc + (p.price ?? 0),
+    const calculatedTotal = productsAll.reduce(
+      (acc, p) => {
+        if (p) {
+          return acc + (p.price ?? 0);
+        }
+        return acc + 0;
+      },
       0,
     );
     if (calculatedTotal !== total) {
