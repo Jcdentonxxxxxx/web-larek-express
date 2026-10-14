@@ -70,7 +70,7 @@ export default async (req: Request, res: Response, next: NextFunction) => {
       return next(new BadRequestError('Ошибка валидации данных при создании заказа: переданная сумма товаров не верна'));
     }
 
-    return res.status(201).send({
+    return res.status(200).send({
       id: faker.string.uuid(),
       total: calculatedTotal,
     });
